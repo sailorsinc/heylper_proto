@@ -20,6 +20,16 @@
     /* Status bar inside each agent/messenger */
     .status-bar { width: 100%; background: #eee; height: 8px; margin-top: 5px; }
     .status-progress { width: 0; height: 100%; background: #888; transition: width 10s linear; }
+    /* Large, centered numbers for agent data */
+    #inputAgentData,
+    #trackingAgentData,
+    #guidanceAgentData,
+    #outputAgentData {
+      font-size: 2.5em;
+      font-weight: bold;
+      text-align: center;
+      line-height: 1.2;
+    }
     /* Reverse fill for second-row status bars */
     .reverse-progress { float: right; }
     /* Pulse effect for messengers */
@@ -44,9 +54,6 @@
 </head>
 <body>
   <div id="controls">
-    <button id="prevBtn">Previous</button>
-    <button id="nextBtn">Next</button>
-    <button id="pauseBtn">Pause</button>
     <span id="phaseDisplay" style="margin-left:20px">Phase:</span>
   </div>
   <div class="container">
@@ -58,6 +65,10 @@
       </div>
     </div>
     <div class="component" style="grid-column: 2; grid-row: 1;">
+      <div id="inputMessengerFeedbackData" class="input-flow" style="margin-bottom:5px;"></div>
+      <div class="status-bar">
+        <div id="status-input-messenger-feedback" class="status-progress reverse-progress"></div>
+      </div>
       <h3>Input Messenger</h3>
       <div id="inputMessengerData" class="input-flow"></div>
       <div class="status-bar">
@@ -79,6 +90,10 @@
       </div>
     </div>
     <div class="component" style="grid-column: 2; grid-row: 2;">
+      <div id="outputMessengerFeedbackData" class="output-flow" style="margin-bottom:5px;"></div>
+      <div class="status-bar">
+        <div id="status-output-messenger-feedback" class="status-progress"></div>
+      </div>
       <h3>Output Messenger</h3>
       <div id="outputMessengerData" class="output-flow"></div>
       <div class="status-bar">
@@ -112,7 +127,7 @@
     let pipeline = [9, 8, 7, 6];
 
     let currentBeat = 0;
-
+s
     const totalBeats = 10;
 
     function simulateCycle(beat) {
@@ -130,6 +145,15 @@
       // Hide messengers during Cycle
       document.getElementById('inputMessengerData').textContent = '';
       document.getElementById('outputMessengerData').textContent = '';
+      // Hide feedback bars and clear feedback data during Cycle
+      const inFbBar = document.getElementById('status-input-messenger-feedback');
+      const outFbBar = document.getElementById('status-output-messenger-feedback');
+      inFbBar.style.transition = 'none';
+      inFbBar.style.width = '0%';
+      outFbBar.style.transition = 'none';
+      outFbBar.style.width = '0%';
+      document.getElementById('inputMessengerFeedbackData').textContent = '';
+      document.getElementById('outputMessengerFeedbackData').textContent = '';
       // Start status-bar animations
       // Reset messenger bars (no animation during Cycle)
       ['input-messenger','output-messenger'].forEach(role => {
@@ -169,13 +193,27 @@
         bar.style.transition = 'width 3s linear';
         bar.style.width = '100%';
       });
-      // Display messenger data being transmitted during Beat
+      // Animate messenger feedback bars during Beat (3s)
+      ['input-messenger-feedback','output-messenger-feedback'].forEach(role => {
+        const bar = document.getElementById(`status-${role}`);
+        bar.style.transition = 'none';
+        bar.style.width = '0%';
+        void bar.offsetWidth;
+        bar.style.transition = 'width 3s linear';
+        bar.style.width = '100%';
+      });
+
+      // Display messenger data and feedback during Beat
       const inEl = document.getElementById('inputMessengerData');
       const outEl = document.getElementById('outputMessengerData');
+      const inFbEl = document.getElementById('inputMessengerFeedbackData');
+      const outFbEl = document.getElementById('outputMessengerFeedbackData');
       inEl.textContent = pipeline[0] != null ? pipeline[0] : '';
       outEl.textContent = pipeline[2] != null ? pipeline[2] : '';
+      inFbEl.textContent = pipeline[1] != null ? `Lookout feedback: ${pipeline[1]}` : '';
+      outFbEl.textContent = pipeline[3] != null ? `Interruption feedback: ${pipeline[3]}` : '';
       // Log beat event
-      addLog(`Beat ${pipeline[0] || ''}: IM:${pipeline[0]||''}, OM:${pipeline[2]||''}`);
+      addLog(`Beat ${pipeline[0] || ''}: IM:${pipeline[0]||''}, OM:${pipeline[2]||''} Lookout feedback:${pipeline[1]||''}, Interruption feedback:${pipeline[3]||''}`);
       // Clear agents
       ['inputAgentData','trackingAgentData','guidanceAgentData','outputAgentData']
         .forEach(id => document.getElementById(id).textContent = '');

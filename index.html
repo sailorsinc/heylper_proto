@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Heylper Beat Simulation</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .component { border: 1px solid #ccc; padding: 10px; margin: 5px 0; }
+    .container { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, auto); gap: 10px; }
+    .container > .component { position: relative; z-index: 1; }
+
+    .input-flow { transition: background-color 0.5s; }
+    .input-flow.odd { background-color: steelblue; color: white; }
+    .input-flow.even { background-color: lightblue; color: black; }
+
+    .output-flow { transition: background-color 0.5s; }
+    .output-flow.odd { background-color: darkgreen; color: white; }
+    .output-flow.even { background-color: lightgreen; color: black; }
+
+    /* Status bar inside each agent/messenger */
+    .status-bar { width: 100%; background: #eee; height: 8px; margin-top: 5px; }
+    .status-progress { width: 0; height: 100%; background: #888; transition: width 10s linear; }
+    /* Reverse fill for second-row status bars */
+    .reverse-progress { float: right; }
+    /* Pulse effect for messengers */
+    .pulse { animation: pulseAnim 1s infinite; }
+    @keyframes pulseAnim {
+      0% { box-shadow: 0 0 5px rgba(0,0,0,0.2); }
+      50% { box-shadow: 0 0 15px rgba(0,0,0,0.6); }
+      100% { box-shadow: 0 0 5px rgba(0,0,0,0.2); }
+    }
+    /* Vertical data transfer animations */
+    .vertical-down { animation: verticalDown 3s ease forwards; }
+    @keyframes verticalDown {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(50px); }
+    }
+    .vertical-up { animation: verticalUp 3s ease forwards; }
+    @keyframes verticalUp {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(-50px); }
+    }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <button id="prevBtn">Previous</button>
+    <button id="nextBtn">Next</button>
+    <button id="pauseBtn">Pause</button>
+    <span id="phaseDisplay" style="margin-left:20px">Cycle 1</span>
+  </div>
+  <div class="container">
+    <div class="component" style="grid-column: 1; grid-row: 1;">
+      <h3>Input Agent</h3>
+      <div id="inputAgentData" class="input-flow"></div>
+      <div class="status-bar">
+        <div id="status-input-agent" class="status-progress"></div>
+      </div>
+    </div>
+    <div class="component" style="grid-column: 2; grid-row: 1;">
+      <h3>Input Messenger</h3>
+      <div id="inputMessengerData" class="input-flow"></div>
+      <div class="status-bar">
+        <div id="status-input-messenger" class="status-progress"></div>
+      </div>
+    </div>
+    <div class="component" style="grid-column: 3; grid-row: 1;">
+      <h3>Tracking Agent</h3>
+      <div id="trackingAgentData" class="input-flow"></div>
+      <div class="status-bar">
+        <div id="status-tracking-agent" class="status-progress"></div>
+      </div>
+    </div>
+    <div class="component" style="grid-column: 1; grid-row: 2;">
+      <h3>Output Agent</h3>
+      <div id="outputAgentData" class="output-flow"></div>
+      <div class="status-bar">
+        <div id="status-output-agent" class="status-progress reverse-progress"></div>
+      </div>
+    </div>
+    <div class="component" style="grid-column: 2; grid-row: 2;">
+      <h3>Output Messenger</h3>
+      <div id="outputMessengerData" class="output-flow"></div>
+      <div class="status-bar">
+        <div id="status-output-messenger" class="status-progress reverse-progress"></div>
+      </div>
+    </div>
+    <div class="component" style="grid-column: 3; grid-row: 2;">
+      <h3>Guidance Agent</h3>
+      <div id="guidanceAgentData" class="output-flow"></div>
+      <div class="status-bar">
+        <div id="status-guidance-agent" class="status-progress reverse-progress"></div>
+      </div>
+    </div>
+  </div>
+  <div id="eventLogContainer" style="margin-top:20px;">
+    <h3>Event Log</h3>
+    <ul id="eventLog" style="list-style:none; padding-left:0;"></ul>
+  </div>
+  
+  <script>
+    function addLog(message) {
+      const ul = document.getElementById('eventLog');
+      if (!ul) return;
+      const li = document.createElement('li');
+      li.textContent = message;
+      ul.appendChild(li);
+      if (ul.children.length > 20) ul.removeChild(ul.firstChild);
+    }
+    
+    // Pipeline of 4 stages: Input, Tracking, Guidance, Output
+    let nextDataId = 10;
+    let pipeline = [9, 8, 7, 6];
+
+    let currentBeat = 0;
+
+    const totalBeats = 10;
+
+    function simulateCycle(beat) {
+      // Display current phase
+      document.getElementById('phaseDisplay').textContent = `Cycle ${beat}`;
+      
+      const inEl = document.getElementById('inputMessengerData');
+      const outEl = document.getElementById('outputMessengerData');
+      // Advance pipeline
+      pipeline.unshift(nextDataId++);
+      pipeline = pipeline.slice(0, 4);
+      document.getElementById('inputAgentData').textContent = pipeline[0] || '';
+      document.getElementById('trackingAgentData').textContent = pipeline[1] || '';
+      document.getElementById('guidanceAgentData').textContent = pipeline[2] || '';
+      document.getElementById('outputAgentData').textContent = pipeline[3] || '';
+      addLog(`Cycle ${beat}: IA:${pipeline[0] || ''}, TA:${pipeline[1] || ''}, GA:${pipeline[2] || ''}, OA:${pipeline[3] || ''}`);
+      // Hide messengers during Cycle
+      document.getElementById('inputMessengerData').textContent = '';
+      document.getElementById('outputMessengerData').textContent = '';
+      // Start status-bar animations
+      // Reset messenger bars (no animation during Cycle)
+      ['input-messenger','output-messenger'].forEach(role => {
+        const bar = document.getElementById(`status-${role}`);
+        bar.style.transition = 'none';
+        bar.style.width = '0%';
+      });
+      // Animate agent bars during Cycle
+      ['input-agent','tracking-agent','guidance-agent','output-agent'].forEach(role => {
+        const bar = document.getElementById(`status-${role}`);
+        bar.style.transition = 'none';
+        bar.style.width = '0%';
+        void bar.offsetWidth;
+        bar.style.transition = 'width 10s linear';
+        bar.style.width = '100%';
+      });
+      
+      // After Cycle 10s, start next Beat
+      setTimeout(() => { simulateBeatPhase(beat + 1); }, 10000);
+    }
+
+    function simulateBeatPhase(beat) {
+      // Enter Beat phase
+      document.getElementById('phaseDisplay').textContent = `Beat ${beat}`;
+      // Reset agent bars (no animation during Beat)
+      ['input-agent','tracking-agent','guidance-agent','output-agent'].forEach(role => {
+        const bar = document.getElementById(`status-${role}`);
+        bar.style.transition = 'none';
+        bar.style.width = '0%';
+      });
+      // Animate messenger bars during Beat (3s)
+      ['input-messenger','output-messenger'].forEach(role => {
+        const bar = document.getElementById(`status-${role}`);
+        bar.style.transition = 'none';
+        bar.style.width = '0%';
+        void bar.offsetWidth;
+        bar.style.transition = 'width 3s linear';
+        bar.style.width = '100%';
+      });
+      // Display messenger data being transmitted during Beat
+      const inEl = document.getElementById('inputMessengerData');
+      const outEl = document.getElementById('outputMessengerData');
+      inEl.textContent = pipeline[0] != null ? pipeline[0] : '';
+      outEl.textContent = pipeline[2] != null ? pipeline[2] : '';
+      addLog(`Beat ${beat}: IM:${pipeline[0] || ''}, OM:${pipeline[2] || ''}`);
+      // Clear agents
+      ['inputAgentData','trackingAgentData','guidanceAgentData','outputAgentData']
+        .forEach(id => document.getElementById(id).textContent = '');
+      // After Beat 3s, transition to Cycle phase
+      setTimeout(() => {
+        simulateCycle(beat);
+      }, 3000);
+    }
+
+    // Initialize
+    currentBeat = 1;
+    // Start the chain: Beat 1
+    simulateBeatPhase(1);
+  </script>
+</body>
+</html>

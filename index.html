@@ -121,11 +121,6 @@
       
       const inEl = document.getElementById('inputMessengerData');
       const outEl = document.getElementById('outputMessengerData');
-      // Advance pipeline on subsequent cycles
-      if (beat > 1) {
-        pipeline.unshift(nextDataId++);
-        pipeline = pipeline.slice(0, 4);
-      }
       document.getElementById('inputAgentData').textContent = pipeline[0] || '';
       document.getElementById('trackingAgentData').textContent = pipeline[1] || '';
       document.getElementById('guidanceAgentData').textContent = pipeline[2] || '';
@@ -186,7 +181,10 @@
         .forEach(id => document.getElementById(id).textContent = '');
       // After Beat 3s, transition to Cycle phase
       setTimeout(() => {
-        simulateCycle(beat);
+        // Advance pipeline for next cycle
+        pipeline.unshift(nextDataId++);
+        pipeline = pipeline.slice(0, 4);
+        simulateCycle(beat + 1);
       }, 3000);
     }
 

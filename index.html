@@ -47,7 +47,7 @@
     <button id="prevBtn">Previous</button>
     <button id="nextBtn">Next</button>
     <button id="pauseBtn">Pause</button>
-    <span id="phaseDisplay" style="margin-left:20px">Cycle 1</span>
+    <span id="phaseDisplay" style="margin-left:20px">Phase:</span>
   </div>
   <div class="container">
     <div class="component" style="grid-column: 1; grid-row: 1;">
@@ -97,7 +97,6 @@
     <h3>Event Log</h3>
     <ul id="eventLog" style="list-style:none; padding-left:0;"></ul>
   </div>
-  
   <script>
     function addLog(message) {
       const ul = document.getElementById('eventLog');
@@ -107,7 +106,7 @@
       ul.appendChild(li);
       if (ul.children.length > 20) ul.removeChild(ul.firstChild);
     }
-    
+
     // Pipeline of 4 stages: Input, Tracking, Guidance, Output
     let nextDataId = 10;
     let pipeline = [9, 8, 7, 6];
@@ -118,18 +117,21 @@
 
     function simulateCycle(beat) {
       // Display current phase
-      document.getElementById('phaseDisplay').textContent = `Cycle ${beat}`;
+      document.getElementById('phaseDisplay').textContent = `Cycle ${pipeline[0] || ''}`;
       
       const inEl = document.getElementById('inputMessengerData');
       const outEl = document.getElementById('outputMessengerData');
-      // Advance pipeline
-      pipeline.unshift(nextDataId++);
-      pipeline = pipeline.slice(0, 4);
+      // Advance pipeline on subsequent cycles
+      if (beat > 1) {
+        pipeline.unshift(nextDataId++);
+        pipeline = pipeline.slice(0, 4);
+      }
       document.getElementById('inputAgentData').textContent = pipeline[0] || '';
       document.getElementById('trackingAgentData').textContent = pipeline[1] || '';
       document.getElementById('guidanceAgentData').textContent = pipeline[2] || '';
       document.getElementById('outputAgentData').textContent = pipeline[3] || '';
-      addLog(`Cycle ${beat}: IA:${pipeline[0] || ''}, TA:${pipeline[1] || ''}, GA:${pipeline[2] || ''}, OA:${pipeline[3] || ''}`);
+      // Log cycle event
+      addLog(`Cycle ${pipeline[0] || ''}: IA:${pipeline[0]||''}, TA:${pipeline[1]||''}, GA:${pipeline[2]||''}, OA:${pipeline[3]||''}`);
       // Hide messengers during Cycle
       document.getElementById('inputMessengerData').textContent = '';
       document.getElementById('outputMessengerData').textContent = '';
@@ -156,7 +158,7 @@
 
     function simulateBeatPhase(beat) {
       // Enter Beat phase
-      document.getElementById('phaseDisplay').textContent = `Beat ${beat}`;
+      document.getElementById('phaseDisplay').textContent = `Beat ${pipeline[0] || ''}`;
       // Reset agent bars (no animation during Beat)
       ['input-agent','tracking-agent','guidance-agent','output-agent'].forEach(role => {
         const bar = document.getElementById(`status-${role}`);
@@ -177,7 +179,8 @@
       const outEl = document.getElementById('outputMessengerData');
       inEl.textContent = pipeline[0] != null ? pipeline[0] : '';
       outEl.textContent = pipeline[2] != null ? pipeline[2] : '';
-      addLog(`Beat ${beat}: IM:${pipeline[0] || ''}, OM:${pipeline[2] || ''}`);
+      // Log beat event
+      addLog(`Beat ${pipeline[0] || ''}: IM:${pipeline[0]||''}, OM:${pipeline[2]||''}`);
       // Clear agents
       ['inputAgentData','trackingAgentData','guidanceAgentData','outputAgentData']
         .forEach(id => document.getElementById(id).textContent = '');

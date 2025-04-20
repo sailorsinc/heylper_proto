@@ -30,6 +30,9 @@
       text-align: center;
       line-height: 1.2;
     }
+    /* Big number and small feedback styling */
+    .big-num { font-size: 2.5em; font-weight: bold; display: block; }
+    .small-text { font-size: 1em; color: #555; display: block; }
     /* Reverse fill for second-row status bars */
     .reverse-progress { float: right; }
     /* Pulse effect for messengers */
@@ -136,9 +139,13 @@
       
       const inEl = document.getElementById('inputMessengerData');
       const outEl = document.getElementById('outputMessengerData');
-      document.getElementById('inputAgentData').textContent = pipeline[0] || '';
+      document.getElementById('inputAgentData').innerHTML =
+        `<span class="big-num">${pipeline[0]}</span>` +
+        `<span class="small-text">+ Lookout feedback ${pipeline[2]}</span>`;
       document.getElementById('trackingAgentData').textContent = pipeline[1] || '';
-      document.getElementById('guidanceAgentData').textContent = pipeline[2] || '';
+      document.getElementById('guidanceAgentData').innerHTML =
+        `<span class="big-num">${pipeline[2]}</span>` +
+        `<span class="small-text">+ Interruption feedback ${pipeline[3]}</span>`;
       document.getElementById('outputAgentData').textContent = pipeline[3] || '';
       // Log cycle event
       addLog(`Cycle ${pipeline[0] || ''}: IA:${pipeline[0]||''}, TA:${pipeline[1]||''}, GA:${pipeline[2]||''}, OA:${pipeline[3]||''}`);
@@ -161,6 +168,8 @@
         bar.style.transition = 'none';
         bar.style.width = '0%';
       });
+      // Clear input messenger status text during Cycle
+      document.getElementById('status-input-messenger').textContent = '';
       // Animate agent bars during Cycle
       ['input-agent','tracking-agent','guidance-agent','output-agent'].forEach(role => {
         const bar = document.getElementById(`status-${role}`);
@@ -193,6 +202,9 @@
         bar.style.transition = 'width 3s linear';
         bar.style.width = '100%';
       });
+      // Show data count inside input messenger status bar during Beat
+      const primaryInBar = document.getElementById('status-input-messenger');
+      primaryInBar.textContent = pipeline[0] != null ? pipeline[0] : '';
       // Animate messenger feedback bars during Beat (3s)
       ['input-messenger-feedback','output-messenger-feedback'].forEach(role => {
         const bar = document.getElementById(`status-${role}`);
@@ -203,12 +215,11 @@
         bar.style.width = '100%';
       });
 
-      // Display messenger data and feedback during Beat
+      // Display only data number during Beat in input and output messengers
       const inEl = document.getElementById('inputMessengerData');
       const outEl = document.getElementById('outputMessengerData');
       const inFbEl = document.getElementById('inputMessengerFeedbackData');
       const outFbEl = document.getElementById('outputMessengerFeedbackData');
-      inEl.textContent = pipeline[0] != null ? pipeline[0] : '';
       outEl.textContent = pipeline[2] != null ? pipeline[2] : '';
       inFbEl.textContent = pipeline[1] != null ? `Lookout feedback: ${pipeline[1]}` : '';
       outFbEl.textContent = pipeline[3] != null ? `Interruption feedback: ${pipeline[3]}` : '';

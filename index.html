@@ -20,6 +20,23 @@
     /* Status bar inside each agent/messenger */
     .status-bar { width: 100%; background: #eee; height: 8px; margin-top: 5px; }
     .status-progress { width: 0; height: 100%; background: #888; transition: width 10s linear; }
+    /* Segmented status bars: 2s per segment */
+    .status-bar {
+      display: flex;
+      gap: 2px;
+      margin-top: 5px;
+      flex-direction: row;
+    }
+    /* Use this on reversed bars */
+    .status-bar.reverse { flex-direction: row-reverse; }
+    .segment {
+      flex: 1;
+      background: #eee;
+      height: 8px;
+    }
+    .segment.filled {
+      background: #888;
+    }
     /* Large, centered numbers for agent data */
     #inputAgentData,
     #trackingAgentData,
@@ -88,7 +105,7 @@
     <div class="component" style="grid-column: 1; grid-row: 2;">
       <h3>Output Agent</h3>
       <div id="outputAgentData" class="output-flow"></div>
-      <div class="status-bar">
+      <div class="status-bar reverse">
         <div id="status-output-agent" class="status-progress reverse-progress"></div>
       </div>
     </div>
@@ -106,7 +123,7 @@
     <div class="component" style="grid-column: 3; grid-row: 2;">
       <h3>Guidance Agent</h3>
       <div id="guidanceAgentData" class="output-flow"></div>
-      <div class="status-bar">
+      <div class="status-bar reverse">
         <div id="status-guidance-agent" class="status-progress reverse-progress"></div>
       </div>
     </div>
@@ -115,20 +132,75 @@
     <h3>Event Log</h3>
     <ul id="eventLog" style="list-style:none; padding-left:0;"></ul>
   </div>
+  <div id="timeSeriesLogContainer" style="margin-top:20px;">
+    <h3>Time-Series Log</h3>
+    <ul id="timeSeriesLog" style="list-style:none; padding-left:0;"></ul>
+  </div>
+  <div id="packetLogContainer" style="margin-top:20px;">
+    <h3>Packet-Wise Log</h3>
+    <div id="packetLog"></div>
+  </div>
   <script>
     function addLog(message) {
       const ul = document.getElementById('eventLog');
       if (!ul) return;
+      const now = ((Date.now() - startTime) / 1000).toFixed(1);
       const li = document.createElement('li');
-      li.textContent = message;
+      li.textContent = `${now}s: ${message}`;
       ul.appendChild(li);
       if (ul.children.length > 20) ul.removeChild(ul.firstChild);
     }
-
+    const startTime = Date.now();
+    function addTimeLog(message) {
+      const ul = document.getElementById('timeSeriesLog'); if (!ul) return;
+      const now = ((Date.now() - startTime)/1000).toFixed(1);
+      const li = document.createElement('li');
+      li.textContent = `${now}s: ${message}`;
+      ul.appendChild(li);
+      if (ul.children.length > 100) ul.removeChild(ul.firstChild);
+    }
+    function addPacketLog(message) {
+      const container = document.getElementById('packetLog');
+      if (!container) return;
+      // Extract packet number and rest of the message
+      // Allow optional 'Cycle N ' or 'Beat N ' prefix before 'Packet'
+      const match = message.match(/^(?:Cycle\s+\d+\s+|Beat\s+\d+\s+)?Packet\s+(\d+):\s*(.*)$/);
+      if (!match) return;
+      const packet = match[1];
+      const text = match[2];
+      // Find or create the packet section
+      let packetDiv = container.querySelector(`.packet-entry.packet-${packet}`);
+      if (!packetDiv) {
+        packetDiv = document.createElement('div');
+        packetDiv.className = `packet-entry packet-${packet}`;
+        const header = document.createElement('h4');
+        header.textContent = `Packet ${packet}`;
+        packetDiv.appendChild(header);
+        const ul = document.createElement('ul');
+        ul.className = 'packet-seg-list';
+        packetDiv.appendChild(ul);
+        container.appendChild(packetDiv);
+      }
+      // Append the segment log to this packet's list
+      const ul = packetDiv.querySelector('ul.packet-seg-list');
+      const li = document.createElement('li');
+      li.textContent = text;
+      ul.appendChild(li);
+      // Trim old entries if desired
+      if (ul.children.length > 100) ul.removeChild(ul.firstChild);
+    }
+    
     // Pipeline of 4 stages: Input, Tracking, Guidance, Output
     let nextDataId = 10;
     let pipeline = [9, 8, 7, 6];
     let lastPipeline = pipeline.slice();
+    // Master segment counts for packets 6–18
+    const masterSegments = {
+      6: 2, 7: 4, 8: 1, 9: 3,
+      10: 2, 11: 5, 12: 1, 13: 4,
+      14: 0, 15: 3, 16: 2, 17: 5,
+      18: 1
+    };
 
     let currentBeat = 0;
 
@@ -150,7 +222,7 @@
       `<span class="small-text">+ Interruption feedback ${lastPipeline[3]}</span>`;
       document.getElementById('outputAgentData').textContent = pipeline[3] || '';
       // Log cycle event
-      addLog(`Cycle ${pipeline[0] || ''}: IA:${pipeline[0]||''}, TA:${pipeline[1]||''}, GA:${pipeline[2]||''}, OA:${pipeline[3]||''}`);
+      // (Original simple cycle log removed in favor of detailed logging below)
       // Hide messengers during Cycle
       document.getElementById('inputMessengerData').textContent = '';
       document.getElementById('outputMessengerData').textContent = '';
@@ -172,15 +244,61 @@
       });
       // Clear input messenger status text during Cycle
       document.getElementById('status-input-messenger').textContent = '';
-      // Animate agent bars during Cycle
+      // Segmented fill per packet based on masterSegments
+      const cycleLength = 10000; // ms
+      // Prepare to record segment timings
+      const segmentData = {};
+      const roles = ['input-agent','tracking-agent','guidance-agent','output-agent'];
+      const roleNames = { 'input-agent': 'IA', 'tracking-agent': 'TA', 'guidance-agent': 'GA', 'output-agent': 'OA' };
       ['input-agent','tracking-agent','guidance-agent','output-agent'].forEach(role => {
+        // Determine packet index for this role
+        const idxMap = { 'input-agent': 0, 'tracking-agent': 1, 'guidance-agent': 2, 'output-agent': 3 };
+        const packet = pipeline[idxMap[role]];
+        const count = masterSegments[packet] || 0;
         const bar = document.getElementById(`status-${role}`);
-        bar.style.transition = 'none';
-        bar.style.width = '0%';
-        void bar.offsetWidth;
-        bar.style.transition = 'width 10s linear';
-        bar.style.width = '100%';
+        const container = bar.parentNode;
+        // Clear old segments
+        container.querySelectorAll('.segment').forEach(s => s.remove());
+        if (count > 0) {
+          // Build count segments
+          for (let i = 0; i < count; i++) {
+            const seg = document.createElement('div');
+            seg.className = 'segment';
+            container.appendChild(seg);
+          }
+          // Generate random fill times and sort
+          const fillTimes = Array.from({ length: count }, () => Math.random() * cycleLength).sort((a, b) => a - b);
+          // Record times for logging
+          segmentData[role] = fillTimes;
+          // Schedule each segment fill at its random time
+          Array.from(container.querySelectorAll('.segment')).forEach((seg, i) => {
+            setTimeout(() => {
+              seg.classList.add('filled');
+              // Use packet from outer scope, no redeclaration
+              const roleLabel = roleNames[role];
+              const segIndex = i + 1;
+              // Time-series log entry
+              addTimeLog(`Cycle ${pipeline[0]}: Packet ${packet}, ${roleLabel} segment ${segIndex}/${count} filled`);
+              // Packet-wise log entry with correct timestamp formatting
+              addPacketLog(
+                `Cycle ${pipeline[0]} Packet ${packet}: ${roleLabel} seg${segIndex} at ${((Date.now() - startTime)/1000).toFixed(1)}s`
+              );
+            }, fillTimes[i]);
+          });
+        }
       });
+      
+      // Log detailed segment info for this cycle
+      const detailLogs = roles.map(role => {
+        const packet = pipeline[{ 'input-agent':0,'tracking-agent':1,'guidance-agent':2,'output-agent':3 }[role]];
+        const count = masterSegments[packet] || 0;
+        // Convert ms to seconds with one decimal
+        const times = (segmentData[role] || []).
+          map(t => (t/1000).toFixed(1) + 's').
+          join(', ');
+        return `${roleNames[role]}(${packet}):${count}[${times}]`;
+      }).join(' | ');
+      addLog(`Cycle ${pipeline[0]} segments → ${detailLogs}`);
       
       // After Cycle 10s, start next Beat
       setTimeout(() => { simulateBeatPhase(beat + 1); }, 10000);
@@ -194,6 +312,11 @@
         const bar = document.getElementById(`status-${role}`);
         bar.style.transition = 'none';
         bar.style.width = '0%';
+      });
+      // Clear any segmented status bars during Beat
+      ['input-agent','tracking-agent','guidance-agent','output-agent'].forEach(role => {
+        const container = document.getElementById(`status-${role}`).parentNode;
+        container.querySelectorAll('.segment').forEach(seg => seg.remove());
       });
       // Animate messenger bars during Beat (3s)
       ['input-messenger','output-messenger'].forEach(role => {
@@ -227,6 +350,12 @@
       outFbEl.textContent = pipeline[3] != null ? `Interruption feedback: ${pipeline[3]}` : '';
       // Log beat event
       addLog(`Beat ${pipeline[0] || ''}: IM:${pipeline[0]||''}, OM:${pipeline[2]||''} Lookout feedback:${pipeline[1]||''}, Interruption feedback:${pipeline[3]||''}`);
+      // Log transfer hops for this Beat
+      const now = ((Date.now() - startTime) / 1000).toFixed(1);
+      addTimeLog(`Beat ${pipeline[0]} transfer: IA→TA:${pipeline[0]}→${pipeline[1]}, TA→GA:${pipeline[1]}→${pipeline[2]}, GA→OA:${pipeline[2]}→${pipeline[3]}`);
+      addPacketLog(`Beat ${pipeline[0]} Packet ${pipeline[0]}: IA→TA at ${now}s`);
+      addPacketLog(`Beat ${pipeline[0]} Packet ${pipeline[1]}: TA→GA at ${now}s`);
+      addPacketLog(`Beat ${pipeline[0]} Packet ${pipeline[2]}: GA→OA at ${now}s`);
       // Clear agents
       ['inputAgentData','trackingAgentData','guidanceAgentData','outputAgentData']
         .forEach(id => document.getElementById(id).textContent = '');

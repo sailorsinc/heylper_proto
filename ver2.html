@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Heylper Beat Simulation</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .component { border: 1px solid #ccc; padding: 10px; margin: 5px 0; }
+    .container { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, auto); gap: 10px; }
+    .container > .component { position: relative; z-index: 1; }
+
+    .input-flow { transition: background-color 0.5s; }
+    .input-flow.odd { background-color: steelblue; color: white; }
+    .input-flow.even { background-color: lightblue; color: black; }
+
+    .output-flow { transition: background-color 0.5s; }
+    .output-flow.odd { background-color: darkgreen; color: white; }
+    .output-flow.even { background-color: lightgreen; color: black; }
+
+    /* Status bar inside each agent/messenger */
+    .status-bar { width: 100%; background: #eee; height: 8px; margin-top: 5px; }
+    .status-progress { width: 0; height: 100%; background: #888; transition: width 10s linear; }
+    /* Segmented status bars: 2s per segment */
+    .status-bar {
+      display: flex;
+      gap: 2px;
+      margin-top: 5px;
+      flex-direction: row;
+    }
+    /* Use this on reversed bars */
+    .status-bar.reverse { flex-direction: row-reverse; }
+    .segment {
+      flex: 1;
+      background: #eee;
+      height: 8px;
+    }
+    .segment.filled {
+      background: #888;
+    }
+    /* Large, centered numbers for agent data */
+    #inputAgentData,
+    #trackingAgentData,
+    #guidanceAgentData,
+    #outputAgentData {
+      font-size: 2.5em;
+      font-weight: bold;
+      text-align: center;
+      line-height: 1.2;
+    }
+    /* Big number and small feedback styling */
+    .big-num { font-size: 2.5em; font-weight: bold; display: block; }
+    .small-text { font-size: 1em; color: #555; display: block; }
+    /* Reverse fill for second-row status bars */
+    .reverse-progress { float: right; }
+    /* Pulse effect for messengers */
+    .pulse { animation: pulseAnim 1s infinite; }
+    @keyframes pulseAnim {
+      0% { box-shadow: 0 0 5px rgba(0,0,0,0.2); }
+      50% { box-shadow: 0 0 15px rgba(0,0,0,0.6); }
+      100% { box-shadow: 0 0 5px rgba(0,0,0,0.2); }
+    }
+    /* Vertical data transfer animations */
+    .vertical-down { animation: verticalDown 3s ease forwards; }
+    @keyframes verticalDown {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(50px); }
+    }
+    .vertical-up { animation: verticalUp 3s ease forwards; }
+    @keyframes verticalUp {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(-50px); }
+    }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <span id="phaseDisplay" style="margin-left:20px">Phase:</span>
+  </div>
+  <div class="container">
+    <div class="component" style="grid-column: 1; grid-row: 1;">
+      <h3>Input Agent</h3>
+      <div id="inputAgentData" class="input-flow"></div>
+      <div class="status-bar">
+        <div id="status-input-agent" class="status-progress"></div>
+      </div>
+    </div>
+    <div class="component" style="grid-column: 2; grid-row: 1;">
+      <div id="inputMessengerFeedbackData" class="input-flow" style="margin-bottom:5px;"></div>
+      <div class="status-bar">
+        <div id="status-input-messenger-feedback" class="status-progress reverse-progress"></div>
+      </div>
+      <h3>Input Messenger</h3>
+      <div id="inputMessengerData" class="input-flow"></div>
+      <div class="status-bar">
+        <div id="status-input-messenger" class="status-progress"></div>
+      </div>
+    </div>
+    <div class="component" style="grid-column: 3; grid-row: 1;">
+      <h3>Tracking Agent</h3>
+      <div id="trackingAgentData" class="input-flow"></div>
+      <div class="status-bar">
+        <div id="status-tracking-agent" class="status-progress"></div>
+      </div>
+    </div>
+    <div class="component" style="grid-column: 1; grid-row: 2;">
+      <h3>Output Agent</h3>
+      <div id="outputAgentData" class="output-flow"></div>
+      <div class="status-bar reverse">
+        <div id="status-output-agent" class="status-progress reverse-progress"></div>
+      </div>
+    </div>
+    <div class="component" style="grid-column: 2; grid-row: 2;">
+      <div id="outputMessengerFeedbackData" class="output-flow" style="margin-bottom:5px;"></div>
+      <div class="status-bar">
+        <div id="status-output-messenger-feedback" class="status-progress"></div>
+      </div>
+      <h3>Output Messenger</h3>
+      <div id="outputMessengerData" class="output-flow"></div>
+      <div class="status-bar">
+        <div id="status-output-messenger" class="status-progress reverse-progress"></div>
+      </div>
+    </div>
+    <div class="component" style="grid-column: 3; grid-row: 2;">
+      <h3>Guidance Agent</h3>
+      <div id="guidanceAgentData" class="output-flow"></div>
+      <div class="status-bar reverse">
+        <div id="status-guidance-agent" class="status-progress reverse-progress"></div>
+      </div>
+    </div>
+  </div>
+  <div id="eventLogContainer" style="margin-top:20px;">
+    <h3>Event Log</h3>
+    <ul id="eventLog" style="list-style:none; padding-left:0;"></ul>
+  </div>
+  <div id="timeSeriesLogContainer" style="margin-top:20px;">
+    <h3>Time-Series Log</h3>
+    <ul id="timeSeriesLog" style="list-style:none; padding-left:0;"></ul>
+  </div>
+  <div id="packetLogContainer" style="margin-top:20px;">
+    <h3>Packet-Wise Log</h3>
+    <div id="packetLog"></div>
+  </div>
+  <script>
+    function addLog(message) {
+      const ul = document.getElementById('eventLog');
+      if (!ul) return;
+      const now = ((Date.now() - startTime) / 1000).toFixed(1);
+      const li = document.createElement('li');
+      li.textContent = `${now}s: ${message}`;
+      ul.appendChild(li);
+      if (ul.children.length > 20) ul.removeChild(ul.firstChild);
+    }
+    const startTime = Date.now();
+    function addTimeLog(message) {
+      const ul = document.getElementById('timeSeriesLog'); if (!ul) return;
+      const now = ((Date.now() - startTime)/1000).toFixed(1);
+      const li = document.createElement('li');
+      li.textContent = `${now}s: ${message}`;
+      ul.appendChild(li);
+      if (ul.children.length > 100) ul.removeChild(ul.firstChild);
+    }
+    function addPacketLog(message) {
+      const container = document.getElementById('packetLog');
+      if (!container) return;
+      // Extract packet number and rest of the message
+      // Allow optional 'Cycle N ' or 'Beat N ' prefix before 'Packet'
+      const match = message.match(/^(?:Cycle\s+\d+\s+|Beat\s+\d+\s+)?Packet\s+(\d+):\s*(.*)$/);
+      if (!match) return;
+      const packet = match[1];
+      const text = match[2];
+      // Find or create the packet section
+      let packetDiv = container.querySelector(`.packet-entry.packet-${packet}`);
+      if (!packetDiv) {
+        packetDiv = document.createElement('div');
+        packetDiv.className = `packet-entry packet-${packet}`;
+        const header = document.createElement('h4');
+        header.textContent = `Packet ${packet}`;
+        packetDiv.appendChild(header);
+        const ul = document.createElement('ul');
+        ul.className = 'packet-seg-list';
+        packetDiv.appendChild(ul);
+        container.appendChild(packetDiv);
+      }
+      // Append the segment log to this packet's list
+      const ul = packetDiv.querySelector('ul.packet-seg-list');
+      const li = document.createElement('li');
+      li.textContent = text;
+      ul.appendChild(li);
+      // Trim old entries if desired
+      if (ul.children.length > 100) ul.removeChild(ul.firstChild);
+    }
+    
+    // Pipeline of 4 stages: Input, Tracking, Guidance, Output
+    let nextDataId = 10;
+    let pipeline = [9, 8, 7, 6];
+    let lastPipeline = pipeline.slice();
+    // Master segment counts for packets 6–18
+    const masterSegments = {
+      6: 2, 7: 4, 8: 1, 9: 3,
+      10: 2, 11: 5, 12: 1, 13: 4,
+      14: 0, 15: 3, 16: 2, 17: 5,
+      18: 1
+    };
+
+    let currentBeat = 0;
+
+    const totalBeats = 10;
+
+    function simulateCycle(beat) {
+    // Removed prevPipeline capture as feedback now uses lastPipeline
+    // Display current phase
+      document.getElementById('phaseDisplay').textContent = `Cycle ${pipeline[0] || ''}`;
+      
+      const inEl = document.getElementById('inputMessengerData');
+      const outEl = document.getElementById('outputMessengerData');
+      document.getElementById('inputAgentData').innerHTML =
+        `<span class="big-num">${pipeline[0]}</span>` +
+        `<span class="small-text">+ Lookout feedback ${pipeline[2]}</span>`;
+      document.getElementById('trackingAgentData').textContent = pipeline[1] || '';
+      document.getElementById('guidanceAgentData').innerHTML =
+        `<span class="big-num">${pipeline[2]}</span>` +
+      `<span class="small-text">+ Interruption feedback ${lastPipeline[3]}</span>`;
+      document.getElementById('outputAgentData').textContent = pipeline[3] || '';
+      // Log cycle event
+      // (Original simple cycle log removed in favor of detailed logging below)
+      // Hide messengers during Cycle
+      document.getElementById('inputMessengerData').textContent = '';
+      document.getElementById('outputMessengerData').textContent = '';
+      // Hide feedback bars and clear feedback data during Cycle
+      const inFbBar = document.getElementById('status-input-messenger-feedback');
+      const outFbBar = document.getElementById('status-output-messenger-feedback');
+      inFbBar.style.transition = 'none';
+      inFbBar.style.width = '0%';
+      outFbBar.style.transition = 'none';
+      outFbBar.style.width = '0%';
+      document.getElementById('inputMessengerFeedbackData').textContent = '';
+      document.getElementById('outputMessengerFeedbackData').textContent = '';
+      // Start status-bar animations
+      // Reset messenger bars (no animation during Cycle)
+      ['input-messenger','output-messenger'].forEach(role => {
+        const bar = document.getElementById(`status-${role}`);
+        bar.style.transition = 'none';
+        bar.style.width = '0%';
+      });
+      // Clear input messenger status text during Cycle
+      document.getElementById('status-input-messenger').textContent = '';
+      // Segmented fill per packet based on masterSegments
+      const cycleLength = 10000; // ms
+      // Prepare to record segment timings
+      const segmentData = {};
+      const roles = ['input-agent','tracking-agent','guidance-agent','output-agent'];
+      const roleNames = { 'input-agent': 'IA', 'tracking-agent': 'TA', 'guidance-agent': 'GA', 'output-agent': 'OA' };
+      ['input-agent','tracking-agent','guidance-agent','output-agent'].forEach(role => {
+        // Determine packet index for this role
+        const idxMap = { 'input-agent': 0, 'tracking-agent': 1, 'guidance-agent': 2, 'output-agent': 3 };
+        const packet = pipeline[idxMap[role]];
+        const count = masterSegments[packet] || 0;
+        const bar = document.getElementById(`status-${role}`);
+        const container = bar.parentNode;
+        // Clear old segments
+        container.querySelectorAll('.segment').forEach(s => s.remove());
+        if (count > 0) {
+          // Build count segments
+          for (let i = 0; i < count; i++) {
+            const seg = document.createElement('div');
+            seg.className = 'segment';
+            container.appendChild(seg);
+          }
+          // Generate random fill times and sort
+          const fillTimes = Array.from({ length: count }, () => Math.random() * cycleLength).sort((a, b) => a - b);
+          // Record times for logging
+          segmentData[role] = fillTimes;
+          // Schedule each segment fill at its random time
+          Array.from(container.querySelectorAll('.segment')).forEach((seg, i) => {
+            setTimeout(() => {
+              seg.classList.add('filled');
+              // Use packet from outer scope, no redeclaration
+              const roleLabel = roleNames[role];
+              const segIndex = i + 1;
+              // Time-series log entry
+              addTimeLog(`Cycle ${pipeline[0]}: Packet ${packet}, ${roleLabel} segment ${segIndex}/${count} filled`);
+              // Packet-wise log entry with correct timestamp formatting
+              addPacketLog(
+                `Cycle ${pipeline[0]} Packet ${packet}: ${roleLabel} seg${segIndex} at ${((Date.now() - startTime)/1000).toFixed(1)}s`
+              );
+            }, fillTimes[i]);
+          });
+        }
+      });
+      
+      // Log detailed segment info for this cycle
+      const detailLogs = roles.map(role => {
+        const packet = pipeline[{ 'input-agent':0,'tracking-agent':1,'guidance-agent':2,'output-agent':3 }[role]];
+        const count = masterSegments[packet] || 0;
+        // Convert ms to seconds with one decimal
+        const times = (segmentData[role] || []).
+          map(t => (t/1000).toFixed(1) + 's').
+          join(', ');
+        return `${roleNames[role]}(${packet}):${count}[${times}]`;
+      }).join(' | ');
+      addLog(`Cycle ${pipeline[0]} segments → ${detailLogs}`);
+      
+      // After Cycle 10s, start next Beat
+      setTimeout(() => { simulateBeatPhase(beat + 1); }, 10000);
+    }
+
+    function simulateBeatPhase(beat) {
+      // Enter Beat phase
+      document.getElementById('phaseDisplay').textContent = `Beat ${pipeline[0] || ''}`;
+      // Reset agent bars (no animation during Beat)
+      ['input-agent','tracking-agent','guidance-agent','output-agent'].forEach(role => {
+        const bar = document.getElementById(`status-${role}`);
+        bar.style.transition = 'none';
+        bar.style.width = '0%';
+      });
+      // Clear any segmented status bars during Beat
+      ['input-agent','tracking-agent','guidance-agent','output-agent'].forEach(role => {
+        const container = document.getElementById(`status-${role}`).parentNode;
+        container.querySelectorAll('.segment').forEach(seg => seg.remove());
+      });
+      // Animate messenger bars during Beat (3s)
+      ['input-messenger','output-messenger'].forEach(role => {
+        const bar = document.getElementById(`status-${role}`);
+        bar.style.transition = 'none';
+        bar.style.width = '0%';
+        void bar.offsetWidth;
+        bar.style.transition = 'width 3s linear';
+        bar.style.width = '100%';
+      });
+      // Show data count inside input messenger status bar during Beat
+      const primaryInBar = document.getElementById('status-input-messenger');
+      primaryInBar.textContent = pipeline[0] != null ? pipeline[0] : '';
+      // Animate messenger feedback bars during Beat (3s)
+      ['input-messenger-feedback','output-messenger-feedback'].forEach(role => {
+        const bar = document.getElementById(`status-${role}`);
+        bar.style.transition = 'none';
+        bar.style.width = '0%';
+        void bar.offsetWidth;
+        bar.style.transition = 'width 3s linear';
+        bar.style.width = '100%';
+      });
+
+      // Display only data number during Beat in input and output messengers
+      const inEl = document.getElementById('inputMessengerData');
+      const outEl = document.getElementById('outputMessengerData');
+      const inFbEl = document.getElementById('inputMessengerFeedbackData');
+      const outFbEl = document.getElementById('outputMessengerFeedbackData');
+      outEl.textContent = pipeline[2] != null ? pipeline[2] : '';
+      inFbEl.textContent = pipeline[1] != null ? `Lookout feedback: ${pipeline[1]}` : '';
+      outFbEl.textContent = pipeline[3] != null ? `Interruption feedback: ${pipeline[3]}` : '';
+      // Log beat event
+      addLog(`Beat ${pipeline[0] || ''}: IM:${pipeline[0]||''}, OM:${pipeline[2]||''} Lookout feedback:${pipeline[1]||''}, Interruption feedback:${pipeline[3]||''}`);
+      // Log transfer hops for this Beat
+      const now = ((Date.now() - startTime) / 1000).toFixed(1);
+      addTimeLog(`Beat ${pipeline[0]} transfer: IA→TA:${pipeline[0]}→${pipeline[1]}, TA→GA:${pipeline[1]}→${pipeline[2]}, GA→OA:${pipeline[2]}→${pipeline[3]}`);
+      addPacketLog(`Beat ${pipeline[0]} Packet ${pipeline[0]}: IA→TA at ${now}s`);
+      addPacketLog(`Beat ${pipeline[0]} Packet ${pipeline[1]}: TA→GA at ${now}s`);
+      addPacketLog(`Beat ${pipeline[0]} Packet ${pipeline[2]}: GA→OA at ${now}s`);
+      // Clear agents
+      ['inputAgentData','trackingAgentData','guidanceAgentData','outputAgentData']
+        .forEach(id => document.getElementById(id).textContent = '');
+      // After Beat 3s, transition to Cycle phase
+      setTimeout(() => {
+        // Remember this cycle’s pipeline for next interruption feedback
+        lastPipeline = pipeline.slice();
+        // Advance pipeline for next cycle
+        pipeline.unshift(nextDataId++);
+        pipeline = pipeline.slice(0, 4);
+        simulateCycle(beat + 1);
+      }, 3000);
+    }
+
+    // Initialize
+    currentBeat = 1;
+    // Start the chain: Beat 1
+    simulateBeatPhase(1);
+  </script>
+</body>
+</html>

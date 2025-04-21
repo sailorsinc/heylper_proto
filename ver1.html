@@ -128,15 +128,13 @@
     // Pipeline of 4 stages: Input, Tracking, Guidance, Output
     let nextDataId = 10;
     let pipeline = [9, 8, 7, 6];
-    let lastPipeline = pipeline.slice();
 
     let currentBeat = 0;
 
     const totalBeats = 10;
 
     function simulateCycle(beat) {
-    // Removed prevPipeline capture as feedback now uses lastPipeline
-    // Display current phase
+      // Display current phase
       document.getElementById('phaseDisplay').textContent = `Cycle ${pipeline[0] || ''}`;
       
       const inEl = document.getElementById('inputMessengerData');
@@ -147,7 +145,7 @@
       document.getElementById('trackingAgentData').textContent = pipeline[1] || '';
       document.getElementById('guidanceAgentData').innerHTML =
         `<span class="big-num">${pipeline[2]}</span>` +
-      `<span class="small-text">+ Interruption feedback ${lastPipeline[3]}</span>`;
+        `<span class="small-text">+ Interruption feedback ${pipeline[3]}</span>`;
       document.getElementById('outputAgentData').textContent = pipeline[3] || '';
       // Log cycle event
       addLog(`Cycle ${pipeline[0] || ''}: IA:${pipeline[0]||''}, TA:${pipeline[1]||''}, GA:${pipeline[2]||''}, OA:${pipeline[3]||''}`);
@@ -232,8 +230,6 @@
         .forEach(id => document.getElementById(id).textContent = '');
       // After Beat 3s, transition to Cycle phase
       setTimeout(() => {
-        // Remember this cycle’s pipeline for next interruption feedback
-        lastPipeline = pipeline.slice();
         // Advance pipeline for next cycle
         pipeline.unshift(nextDataId++);
         pipeline = pipeline.slice(0, 4);

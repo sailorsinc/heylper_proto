@@ -58,6 +58,8 @@
 <body>
   <div id="controls">
     <span id="phaseDisplay" style="margin-left:20px">Phase:</span>
+    <button id="pauseBtn" style="margin-left:10px;">Pause</button>
+    <div id="pauseInfo" class="small-text" style="margin-left:20px; margin-top:5px; color:#555;"></div>
   </div>
   <div class="container">
     <div class="component" style="grid-column: 1; grid-row: 1;">
@@ -134,7 +136,13 @@
 
     const totalBeats = 10;
 
+let isPaused = false;
+let cycleTimeout, beatTimeout;
+let pendingPause = false;
+
     function simulateCycle(beat) {
+      // Clear pause info when entering new phase
+      document.getElementById('pauseInfo').textContent = '';
       // Clear input messenger count when not in Beat phase
       document.getElementById('inputMessengerCount').textContent = '';
       document.getElementById('inputMessengerFeedbackData').textContent = '';
@@ -187,10 +195,25 @@
       });
       
       // After Cycle 10s, start next Beat
-      setTimeout(() => { simulateBeatPhase(beat + 1); }, 10000);
+    cycleTimeout = setTimeout(() => {
+      if (!isPaused) {
+        if (pendingPause) {
+          isPaused = true;
+          pendingPause = false;
+          const btn = document.getElementById('pauseBtn');
+          btn.textContent = 'Resume';
+          btn.disabled = false;
+          document.getElementById('pauseInfo').textContent = '';
+        } else {
+          simulateBeatPhase(beat + 1);
+        }
+      }
+    }, 10000);
     }
 
     function simulateBeatPhase(beat) {
+      // Clear pause info when entering new phase
+      document.getElementById('pauseInfo').textContent = '';
       // Enter Beat phase
       document.getElementById('phaseDisplay').textContent = `Beat ${pipeline[0] || ''}`;
       // Reset agent bars (no animation during Beat)
@@ -237,13 +260,53 @@
       ['inputAgentData','trackingAgentData','guidanceAgentData','outputAgentData']
         .forEach(id => document.getElementById(id).textContent = '');
       // After Beat 3s, transition to Cycle phase
-      setTimeout(() => {
-        // Advance pipeline for next cycle
-        pipeline.unshift(nextDataId++);
-        pipeline = pipeline.slice(0, 4);
-        simulateCycle(beat + 1);
-      }, 3000);
+    beatTimeout = setTimeout(() => {
+      if (!isPaused) {
+        if (pendingPause) {
+          isPaused = true;
+          pendingPause = false;
+          const btn = document.getElementById('pauseBtn');
+          btn.textContent = 'Resume';
+          btn.disabled = false;
+          document.getElementById('pauseInfo').textContent = '';
+        } else {
+          // Advance pipeline for next cycle
+          pipeline.unshift(nextDataId++);
+          pipeline = pipeline.slice(0, 4);
+          simulateCycle(beat + 1);
+        }
+      }
+    }, 3000);
     }
+
+document.getElementById('pauseBtn').addEventListener('click', function() {
+  if (!isPaused) {
+    // Begin pending pause
+    pendingPause = true;
+    this.disabled = true;
+    // Determine current phase
+    const phaseText = document.getElementById('phaseDisplay').textContent;
+    const phaseName = phaseText.startsWith('Beat') ? 'beat' : 'cycle';
+    document.getElementById('pauseInfo').textContent = `Will pause after the current ${phaseName} ends.`;
+    // No immediate pause; wait for phase end
+    // clearTimeout(cycleTimeout);
+    // clearTimeout(beatTimeout);
+    // isPaused = true;
+  } else {
+    isPaused = false;
+    this.textContent = 'Pause';
+    this.disabled = false;
+    pendingPause = false;
+    document.getElementById('pauseInfo').textContent = '';
+    // Resume based on current phase display
+    const phaseText = document.getElementById('phaseDisplay').textContent;
+    if (phaseText.startsWith('Cycle')) {
+      simulateBeatPhase();
+    } else {
+      simulateCycle();
+    }
+  }
+});
 
     // Initialize
     currentBeat = 1;
